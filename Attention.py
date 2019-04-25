@@ -114,7 +114,9 @@ class Multihead_Attention(nn.Module):
                  hidden_dim,
                  C_q=None,
                  C_k=None,
-                 C_v=None):
+                 C_v=None,
+                 num_heads=1,
+                 dropout_rate=0.0):
         super(Multihead_Attention, self).__init__()
         self.hidden_dim = hidden_dim
         C_q = C_q if C_q else hidden_dim
@@ -123,20 +125,19 @@ class Multihead_Attention(nn.Module):
         self.linear_Q = nn.Linear(C_q, hidden_dim)
         self.linear_K = nn.Linear(C_k, hidden_dim)
         self.linear_V = nn.Linear(C_v, hidden_dim)
+        self.num_heads = num_heads
         self.norm = nn.LayerNorm(hidden_dim)
+        self.dropout = nn.Dropout(p=dropout_rate)
 
     def forward(self,
-                Q, K, V,
-                num_heads=1,
-                dropout_rate=0.0):
+                Q, K, V):
         """
         :param Q: A 3d tensor with shape of [N, T_q, C_q]
         :param K: A 3d tensor with shape of [N, T_k, C_k]
         :param V: A 3d tensor with shape of [N, T_v, C_v]
-        :param num_heads:
-        :param dropout_rate:
         :return:
         """
+        num_heads = self.num_heads
         N = Q.size()[0]
 
         # Linear projections
@@ -177,7 +178,7 @@ class Multihead_Attention(nn.Module):
         outputs = outputs * query_masks  # broadcasting. (h*N, T_q, T_k)
 
         # Dropouts
-        outputs = nn.Dropout(p=dropout_rate)(outputs)
+        outputs = self.dropout(outputs)
 
         # Weighted sum
         outputs = torch.bmm(outputs, V_)  # ( h*N, T_q, C/h)
@@ -206,5 +207,7 @@ if __name__ == '__main__':
     attention2 = Attention2(hidden_dim=features.size()[-1])
     print(attention2(features))
 
-    attention3 = Multihead_Attention(hidden_dim=features.size()[-1])
-    print(attention3(features, features, features, 2))
+    attention3 = Multihead_Attention(hidden_dim=features.size()[-1],
+                                     num_heads=2,
+                                     dropout_rate=0.0)
+    print(attention3(features, features, features))
